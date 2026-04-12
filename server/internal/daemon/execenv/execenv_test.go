@@ -391,6 +391,44 @@ func TestInjectRuntimeConfigClaude(t *testing.T) {
 	}
 }
 
+func TestInjectRuntimeConfigGemini(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	ctx := TaskContextForEnv{
+		IssueID:     "test-issue-id",
+		AgentSkills: []SkillContextForEnv{{Name: "Writing", Content: "Write clearly."}},
+	}
+
+	if err := InjectRuntimeConfig(dir, "gemini", ctx); err != nil {
+		t.Fatalf("InjectRuntimeConfig failed: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "GEMINI.md"))
+	if err != nil {
+		t.Fatalf("failed to read GEMINI.md: %v", err)
+	}
+
+	s := string(content)
+	for _, want := range []string{
+		"Multica Agent Runtime",
+		"multica issue get",
+		"Writing",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("GEMINI.md missing %q", want)
+		}
+	}
+
+	// Should not write CLAUDE.md or AGENTS.md for gemini provider.
+	if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Error("gemini provider should not create CLAUDE.md")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Error("gemini provider should not create AGENTS.md")
+	}
+}
+
 func TestInjectRuntimeConfigCodex(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
