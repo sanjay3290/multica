@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -318,5 +320,47 @@ func TestRepoCheckoutClientDeadlineExceedsGitTimeout(t *testing.T) {
 	}
 	if deadline != repocache.GitTimeout+checkoutDeadlineHeadroom {
 		t.Fatalf("checkout client deadline = %s, want repocache.GitTimeout + headroom = %s", deadline, repocache.GitTimeout+checkoutDeadlineHeadroom)
+	}
+}
+
+func TestRunRepoCheckoutCancelsRequestOnSwappedTimeout(t *testing.T) {
+	previousTimeout := repoCheckoutTimeout
+	repoCheckoutTimeout = func() time.Duration { return 50 * time.Millisecond }
+	t.Cleanup(func() { repoCheckoutTimeout = previousTimeout })
+
+	canceled := make(chan struct{})
+	var closeOnce sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Drain the body so the server's background read can detect the
+		// client disconnect and cancel the request context.
+		_, _ = io.ReadAll(r.Body)
+		select {
+		case <-r.Context().Done():
+			t.Logf("handler saw done")
+			closeOnce.Do(func() { close(canceled) })
+		case <-time.After(5 * time.Second):
+			json.NewEncoder(w).Encode(map[string]string{"path": "/work/repo", "branch_name": "agent/test/task"})
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("MULTICA_DAEMON_PORT", strings.TrimPrefix(srv.URL, "http://127.0.0.1:"))
+	t.Setenv("MULTICA_WORKSPACE_ID", "ws-1")
+	t.Setenv("MULTICA_AGENT_NAME", "Test Agent")
+	t.Setenv("MULTICA_TASK_ID", "task-1")
+	t.Setenv("MULTICA_TOKEN", "mat_repo_checkout_test")
+
+	err := runRepoCheckout(&cobra.Command{}, []string{"https://github.com/org/repo.git"})
+	if err == nil {
+		close(canceled)
+		t.Fatal("runRepoCheckout returned nil; the swapped timeout did not cancel the in-flight request")
+	}
+	if !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("error = %v, want context deadline exceeded from the applied timeout", err)
+	}
+	select {
+	case <-canceled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler never observed request cancellation; runRepoCheckout did not apply the timeout to its request")
 	}
 }

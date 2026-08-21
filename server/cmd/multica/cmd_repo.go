@@ -337,6 +337,11 @@ func runRepoRemove(cmd *cobra.Command, args []string) error {
 // daemon checkout. It is derived from repocache.GitTimeout plus
 // checkoutDeadlineHeadroom so it is always strictly later than the daemon's
 // own git timeout.
+// repoCheckoutTimeout is the deadline runRepoCheckout actually applies to
+// its daemon request. It is a variable so tests can pin the call site by
+// observing cancellation on the wire.
+var repoCheckoutTimeout = repoCheckoutClientTimeout
+
 func repoCheckoutClientTimeout() time.Duration {
 	return repocache.GitTimeout + checkoutDeadlineHeadroom
 }
@@ -390,7 +395,7 @@ func runRepoCheckout(cmd *cobra.Command, args []string) error {
 	// cancels its HTTP request while the daemon's git process is still
 	// writing files normally, and the user sees a misleading "context
 	// deadline exceeded" for a healthy checkout.
-	ctx, cancel := context.WithTimeout(parentCtx, repoCheckoutClientTimeout())
+	ctx, cancel := context.WithTimeout(parentCtx, repoCheckoutTimeout())
 	defer cancel()
 	client := &http.Client{}
 	checkoutURL := fmt.Sprintf("http://127.0.0.1:%s/repo/checkout", daemonPort)
