@@ -316,4 +316,7 @@ func TestRepoCheckoutClientDeadlineExceedsGitTimeout(t *testing.T) {
 	if deadline <= repocache.GitTimeout {
 		t.Fatalf("checkout client deadline = %s, must be strictly greater than repocache.GitTimeout = %s", deadline, repocache.GitTimeout)
 	}
+	if deadline != repocache.GitTimeout+checkoutDeadlineHeadroom {
+		t.Fatalf("checkout client deadline = %s, want repocache.GitTimeout + headroom = %s", deadline, repocache.GitTimeout+checkoutDeadlineHeadroom)
+	}
 }

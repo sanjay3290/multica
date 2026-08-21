@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/multica-ai/multica/server/internal/cli"
+	"github.com/multica-ai/multica/server/internal/daemon/repocache"
 	"github.com/spf13/cobra"
 )
 
@@ -333,10 +334,14 @@ func runRepoRemove(cmd *cobra.Command, args []string) error {
 }
 
 // repoCheckoutClientTimeout returns the client deadline for waiting on a
-// daemon checkout.
+// daemon checkout. It is derived from repocache.GitTimeout plus
+// checkoutDeadlineHeadroom so it is always strictly later than the daemon's
+// own git timeout.
 func repoCheckoutClientTimeout() time.Duration {
-	return 5 * time.Minute
+	return repocache.GitTimeout + checkoutDeadlineHeadroom
 }
+
+const checkoutDeadlineHeadroom = 30 * time.Second
 
 func runRepoCheckout(cmd *cobra.Command, args []string) error {
 	repoURL := args[0]
@@ -380,7 +385,12 @@ func runRepoCheckout(cmd *cobra.Command, args []string) error {
 	if parentCtx == nil {
 		parentCtx = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Minute)
+	// checkoutDeadlineHeadroom keeps the client deadline strictly later than
+	// the daemon's git timeout (repocache.GitTimeout). Without it the CLI
+	// cancels its HTTP request while the daemon's git process is still
+	// writing files normally, and the user sees a misleading "context
+	// deadline exceeded" for a healthy checkout.
+	ctx, cancel := context.WithTimeout(parentCtx, repoCheckoutClientTimeout())
 	defer cancel()
 	client := &http.Client{}
 	checkoutURL := fmt.Sprintf("http://127.0.0.1:%s/repo/checkout", daemonPort)
