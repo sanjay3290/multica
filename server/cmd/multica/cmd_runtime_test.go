@@ -145,7 +145,7 @@ func TestRunRuntimeDeleteCascadeConfirmsActiveAgentSnapshot(t *testing.T) {
 			gotExpectedIDs = body.ExpectedActiveAgentIDs
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":          "ok",
-				"agents_unbound": 2,
+				"agents_unbound":  2,
 				"tasks_cancelled": 1,
 			})
 		default:

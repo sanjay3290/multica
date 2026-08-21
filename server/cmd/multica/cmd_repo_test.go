@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/multica-ai/multica/server/internal/daemon/repocache"
 	"github.com/spf13/cobra"
 )
 
@@ -305,5 +306,14 @@ func TestRepoCheckoutRetryDelay(t *testing.T) {
 	}
 	if got := repoCheckoutRetryDelay("invalid", now); got != time.Second {
 		t.Fatalf("default delay = %s, want 1s", got)
+	}
+}
+
+func TestRepoCheckoutClientDeadlineExceedsGitTimeout(t *testing.T) {
+	t.Parallel()
+
+	deadline := repoCheckoutClientTimeout()
+	if deadline <= repocache.GitTimeout {
+		t.Fatalf("checkout client deadline = %s, must be strictly greater than repocache.GitTimeout = %s", deadline, repocache.GitTimeout)
 	}
 }

@@ -66,7 +66,14 @@ var agentGitExcludePatterns = []string{
 	".codebuddy",
 }
 
-const repoCacheGitTimeout = 10 * time.Minute
+// GitTimeout is the maximum time a single git operation in the repo cache
+// may run. It is the single source of truth for git timeouts; callers that
+// wait on these operations (e.g. the CLI checkout client) must allow more
+// time than this so they never cancel a healthy in-progress git process.
+const GitTimeout = 10 * time.Minute
+
+// repoCacheGitTimeout is an in-package alias for GitTimeout.
+const repoCacheGitTimeout = GitTimeout
 
 func newGitCommand(args ...string) *exec.Cmd {
 	cmd := exec.Command("git", args...)

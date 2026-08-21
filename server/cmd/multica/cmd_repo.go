@@ -332,6 +332,12 @@ func runRepoRemove(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// repoCheckoutClientTimeout returns the client deadline for waiting on a
+// daemon checkout.
+func repoCheckoutClientTimeout() time.Duration {
+	return 5 * time.Minute
+}
+
 func runRepoCheckout(cmd *cobra.Command, args []string) error {
 	repoURL := args[0]
 
